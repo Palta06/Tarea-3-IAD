@@ -23,30 +23,28 @@ import pandas as pd
 
 def load_data_csv(data_path, config_path):
     """
-    Carga los datos y parámetros de configuración.
-
-    Parámetros:
-    - data_path: ruta al archivo CSV de datos (última columna de etiquetas).
-    - config_path: ruta al CSV de configuración (sigma2 y lambda).
-
-    Retorna:
-    - X: matriz de características (numpy.ndarray).
-    - y: vector de etiquetas (numpy.ndarray).
-    - sigma2: varianza del kernel Gaussiano (float).
-    - lambd: parámetro de regularización (float).
+    Carga los datos y parámetros de configuración,
+    descartando la primera columna (ID) y asignando
+    X = columnas 1…D-1, y = columna D.
     """
-    # Carga de datos
-    df = pd.read_csv(data_path)
-    *feat_cols, label_col = df.columns
-    X = df.drop(columns=[label_col]).values
-    y = df[label_col].values
+    # Leer sin encabezado
+    df = pd.read_csv(data_path, header=None)
 
-    # Carga de configuración (dos filas: sigma2, lambda)
+    # Eliminar columna 0 (ID)
+    df = df.drop(columns=[0])
+
+    # Separar características y etiqueta
+    X = df.iloc[:, :-1].values
+    y = df.iloc[:,  -1].values
+
+    # Cargar sigma2 y lambda (sin elevar nada)
     conf = pd.read_csv(config_path, header=None).values.flatten()
-    sigma2 = float(conf[0])
-    lambd = float(conf[1])
+    sigma2 = float(conf[0])   # aquí usamos directamente 4.5
+    lambd  = float(conf[1])   # 0.01
 
     return X, y, sigma2, lambd
+
+
 
 def kernel_mtx(X1, X2, sigma2):
     """
@@ -80,12 +78,12 @@ def krr_coeff(K, y, lambd):
     """
     n = K.shape[0]
     K_reg = K + lambd * np.eye(n)
-    beta = np.linalg.solve(K_reg, y)
+    beta = np.linalg.pinv(K_reg) @ y
     return beta
 
 def confusion_mtx(y_true, y_pred):
     """
-    Calcula matriz de confusión sin usar sklearn.
+    Calcula matriz de confusión
 
     Parámetros:
     - y_true: vector de verdaderos.
@@ -127,7 +125,7 @@ def metricas(y_true, y_pred):
         precisions.append(precision)
         recalls.append(recall)
         f1s.append(f1)
-        
+
     metrics_df = pd.DataFrame({
         'precision': precisions,
         'recall': recalls,
